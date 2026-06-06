@@ -1,0 +1,45 @@
+US4012 - Vibe Coding for Startups
+Semester 2, 2026
+
+COURSE OVERVIEW
+
+This subject introduces startup development, prompt engineering, React,
+Python backends, databases, and cloud deployment.
+
+IMPORTANT ASSESSMENT DEADLINES
+
+Online Quiz 1
+Type: Quiz
+Due date: July 15, 2026
+Details: Complete the online quiz covering startup and MVP concepts.
+
+Assignment 1 - Startup Idea Proposal
+Type: Assignment
+Due date: August 3, 2026
+Details: Submit a two-page proposal explaining the problem, target users,
+and proposed solution.
+
+MVP Prototype Presentation
+Type: Presentation
+Due date: September 10, 2026
+Details: Present a working frontend MVP and explain the main user journey.
+
+Mid-Semester Exam
+Type: Exam
+Due date: October 5, 2026
+Details: The exam covers React fundamentals, APIs, and database concepts.
+
+Assignment 3 - Full-Stack Application
+Type: Assignment
+Due date: November 12, 2026
+Details: Deploy a React and Python application using Supabase and Vercel.
+
+Final Project Presentation
+Type: Presentation
+Due date: November 25, 2026
+Details: Demonstrate the deployed application and discuss user feedback.
+
+REMINDER
+
+Students should submit all assignments before 11:55 PM on the listed due
+date. Late submissions may receive a penalty.

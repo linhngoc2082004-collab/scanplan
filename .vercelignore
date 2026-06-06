@@ -1,0 +1,11 @@
+*.pdf
+context.txt
+.git
+.agents
+.codex
+backend/.env
+backend/.venv
+backend/__pycache__
+backend/backend-*.log
+scanplan/node_modules
+scanplan/dist

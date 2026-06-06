@@ -1,0 +1,7 @@
+{
+  "name": "scanplan-fullstack",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix scanplan install && npm --prefix scanplan run build"
+  }
+}
