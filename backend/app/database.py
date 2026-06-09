@@ -13,7 +13,14 @@ from .config import DATABASE_URL
 
 
 def _connect():
-    return psycopg.connect(DATABASE_URL, row_factory=dict_row)
+    # Vercel uses short-lived serverless functions. Supabase's transaction
+    # pooler is the recommended connection type and does not support prepared
+    # statements, so disable them for these connections.
+    return psycopg.connect(
+        DATABASE_URL,
+        row_factory=dict_row,
+        prepare_threshold=None,
+    )
 
 
 async def close_pool():

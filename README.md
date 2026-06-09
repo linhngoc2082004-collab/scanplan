@@ -47,3 +47,7 @@ Open `http://localhost:5173`.
 
 Import this GitHub repository into Vercel and add `SUPABASE_URL`,
 `SUPABASE_ANON_KEY`, and `DATABASE_URL` as environment variables.
+
+For `DATABASE_URL`, use the Supabase **Transaction pooler** connection string
+(port `6543`) because Vercel serverless functions cannot use the direct IPv6
+database connection.
