@@ -73,7 +73,7 @@ export async function login(email: string, password: string) {
   });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || "Login failed");
+    throw new Error(errorData.detail || `Login failed (${response.status})`);
   }
   const data = await response.json();
   // Save the access token to localStorage
