@@ -90,7 +90,14 @@ def extract_text(file_bytes: bytes, filename: str) -> str:
     """
     lower_name = filename.lower()
     if lower_name.endswith(".pdf"):
-        return extract_text_from_pdf(file_bytes)
+        text = extract_text_from_pdf(file_bytes)
+        # Check if the PDF appears to be scanned (no extractable text)
+        if not text.strip():
+            raise ValueError(
+                "This PDF appears to be a scanned image with no extractable text. "
+                "Please use the camera or manual-entry feature to add your deadlines."
+            )
+        return text
     elif lower_name.endswith(".docx"):
         return extract_text_from_docx(file_bytes)
     else:
@@ -109,8 +116,8 @@ def _month_name_to_number(name: str) -> int:
 
 
 def _make_date_str(year: int, month: int, day: int) -> str:
-    """Format a date as ISO string for the database."""
-    return f"{year:04d}-{month:02d}-{day:02d}T23:59:00"
+    """Format a date as ISO string for the database, using UTC to avoid timezone day shifts."""
+    return f"{year:04d}-{month:02d}-{day:02d}T23:59:00Z"
 
 
 def _find_keyword_nearby(text: str, match_start: int, match_end: int,

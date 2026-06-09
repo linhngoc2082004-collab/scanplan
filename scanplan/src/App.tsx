@@ -4,6 +4,7 @@ import CreateAccount from './screens/CreateAccount';
 import UploadSyllabus from './screens/UploadSyllabus';
 import ExtractingDeadlines from './screens/ExtractingDeadlines';
 import DeadlinesDetected from './screens/DeadlinesDetected';
+import ManualDeadline from './screens/ManualDeadline';
 import ReminderSettings from './screens/ReminderSettings';
 import Dashboard from './screens/Dashboard';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/upload" element={protectedPage(<UploadSyllabus />)} />
         <Route path="/extracting" element={protectedPage(<ExtractingDeadlines />)} />
         <Route path="/deadlines" element={protectedPage(<DeadlinesDetected />)} />
+        <Route path="/manual-deadline" element={protectedPage(<ManualDeadline />)} />
         <Route path="/settings" element={protectedPage(<ReminderSettings />)} />
         <Route path="/dashboard" element={protectedPage(<Dashboard />)} />
       </Routes>

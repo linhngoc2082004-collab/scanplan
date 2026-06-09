@@ -89,3 +89,7 @@ class DeadlineDetected(BaseModel):
 class SyllabusUploadResponse(BaseModel):
     message: str
     deadlines: list[DeadlineDetected]
+
+
+class ConfirmDeadlinesRequest(BaseModel):
+    deadlines: list[DeadlineDetected]

@@ -164,14 +164,44 @@ export async function uploadSyllabus(file: File) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${BACKEND_URL}/syllabus/upload`, {
-    method: "POST",
-    headers,
-    body: formData,
-  });
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || "Upload failed");
+  // Create an AbortController for timeout handling
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/syllabus/upload`, {
+      method: "POST",
+      headers,
+      body: formData,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || "Upload failed");
+    }
+    return response.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === "AbortError") {
+      throw new Error("Upload timed out. Please try again.");
+    }
+    throw err;
   }
-  return response.json();
+}
+
+// ---------------------------------------------------------------
+// Batch Confirm Deadlines (after review)
+// ---------------------------------------------------------------
+
+export async function confirmDeadlines(deadlines: Array<{
+  title: string;
+  course_name?: string;
+  deadline_type?: string;
+  due_date: string;
+}>) {
+  return authFetch(`${BACKEND_URL}/deadlines/confirm`, {
+    method: "POST",
+    body: JSON.stringify({ deadlines }),
+  });
 }

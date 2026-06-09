@@ -364,6 +364,12 @@ export default function Dashboard() {
           Upload New Syllabus
         </button>
         <button
+          onClick={() => navigate('/manual-deadline')}
+          className="w-full bg-white text-brand font-semibold py-3 px-4 rounded-lg mb-3 border-2 border-dashed border-brand/50 hover:bg-brand/5 transition-colors"
+        >
+          + Add Deadline Manually
+        </button>
+        <button
           onClick={() => navigate('/settings')}
           className="w-full bg-brand text-white font-semibold py-3 px-4 rounded-lg mb-6 hover:bg-brand/90 transition-colors"
         >

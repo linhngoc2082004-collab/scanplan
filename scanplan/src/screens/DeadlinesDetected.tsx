@@ -4,7 +4,7 @@ import Layout from '../components/Layout';
 import BackArrow from '../components/BackArrow';
 import DeadlineCard from '../components/DeadlineCard';
 import OrangeButton from '../components/OrangeButton';
-import { createDeadline, updateDeadline, deleteDeadline } from '../lib/backendApi';
+import { confirmDeadlines, createDeadline, updateDeadline, deleteDeadline } from '../lib/backendApi';
 import type { Deadline } from '../types';
 
 export default function DeadlinesDetected() {
@@ -22,14 +22,23 @@ export default function DeadlinesDetected() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDate, setNewDate] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
 
   useEffect(() => {
     // Convert uploaded deadlines to the frontend Deadline format
     const formatted: Deadline[] = uploadedDeadlines.map((dl: any, index: number) => {
-      const [, monthNumber, dayNumber] = dl.due_date.slice(0, 10).split('-').map(Number);
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const month = monthNames[monthNumber - 1];
-      const day = dayNumber.toString();
+      // Parse the due_date from the backend
+      let month = 'Jan';
+      let day = '1';
+      if (dl.due_date) {
+        const parts = dl.due_date.slice(0, 10).split('-').map(Number);
+        if (parts.length === 3) {
+          const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          month = monthNames[parts[1] - 1] || 'Jan';
+          day = parts[2].toString();
+        }
+      }
       return {
         id: dl.id || `temp-${index}`,
         title: dl.title,
@@ -56,7 +65,7 @@ export default function DeadlinesDetected() {
     let dueDate: string | undefined;
     const parsedDate = new Date(`${editDate} ${new Date().getFullYear()}`);
     if (!Number.isNaN(parsedDate.getTime())) {
-      dueDate = `${parsedDate.getFullYear()}-${String(parsedDate.getMonth() + 1).padStart(2, '0')}-${String(parsedDate.getDate()).padStart(2, '0')}T12:00:00Z`;
+      dueDate = `${parsedDate.getFullYear()}-${String(parsedDate.getMonth() + 1).padStart(2, '0')}-${String(parsedDate.getDate()).padStart(2, '0')}T23:59:00Z`;
     }
 
     if (!editingId.startsWith('temp-')) {
@@ -105,7 +114,7 @@ export default function DeadlinesDetected() {
       const saved = await createDeadline({
         title: newTitle,
         deadline_type: 'assignment',
-        due_date: `${parsedDate.getFullYear()}-${String(parsedDate.getMonth() + 1).padStart(2, '0')}-${String(parsedDate.getDate()).padStart(2, '0')}T12:00:00Z`,
+        due_date: `${parsedDate.getFullYear()}-${String(parsedDate.getMonth() + 1).padStart(2, '0')}-${String(parsedDate.getDate()).padStart(2, '0')}T23:59:00Z`,
       });
       const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       const [, savedMonth, savedDay] = saved.due_date.slice(0, 10).split('-').map(Number);
@@ -129,8 +138,55 @@ export default function DeadlinesDetected() {
     setShowAddForm(false);
   };
 
-  const handleContinue = () => {
-    navigate('/dashboard');
+  const handleSaveAll = async () => {
+    setSaving(true);
+    setSaveMessage('');
+
+    // Only save deadlines that haven't been saved yet (temp IDs)
+    const deadlinesToSave = deadlines.filter((d) => d.id.startsWith('temp-'));
+    // Also save manually added ones that already have real IDs are already saved
+
+    if (deadlinesToSave.length === 0) {
+      // All deadlines already saved
+      navigate('/dashboard');
+      return;
+    }
+
+    try {
+      const result = await confirmDeadlines(
+        deadlinesToSave.map((d) => ({
+          title: d.title,
+          course_name: d.course_name || '',
+          deadline_type: d.deadline_type || 'assignment',
+          due_date: d.due_date || '',
+        }))
+      );
+
+      // Update temp IDs with real IDs from the backend
+      const savedMap = result.deadlines || [];
+      setDeadlines((prev) =>
+        prev.map((d) => {
+          if (d.id.startsWith('temp-') && savedMap.length > 0) {
+            // Find the matching saved deadline by index
+            const saved = savedMap.find((s: any) => s.title === d.title);
+            if (saved) {
+              return { ...d, id: saved.id };
+            }
+          }
+          return d;
+        })
+      );
+
+      setSaveMessage(`✅ ${result.message || 'Deadlines saved successfully!'}`);
+      // Auto-navigate after a short delay
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1500);
+    } catch (err: any) {
+      setSaveMessage(`❌ ${err.message || 'Failed to save deadlines.'}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -150,6 +206,15 @@ export default function DeadlinesDetected() {
       <p className="text-gray-500 text-sm mb-6">
         ScanPlan found {deadlines.length} deadlines in your syllabus.
       </p>
+
+      {/* Save status message */}
+      {saveMessage && (
+        <div className={`px-4 py-3 rounded-lg mb-4 text-sm font-medium ${
+          saveMessage.startsWith('✅') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+        }`}>
+          {saveMessage}
+        </div>
+      )}
 
       {/* Deadline cards */}
       <div className="mb-8">
@@ -234,8 +299,16 @@ export default function DeadlinesDetected() {
         </div>
       )}
 
-      <OrangeButton onClick={handleContinue}>
-        Continue to Dashboard
+      {/* Add Deadline Manually button (navigate to full form) */}
+      <button
+        onClick={() => navigate('/manual-deadline')}
+        className="w-full mb-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-brand hover:text-brand transition-colors text-sm font-medium"
+      >
+        + Add Deadline Manually (Full Form)
+      </button>
+
+      <OrangeButton onClick={handleSaveAll} disabled={saving}>
+        {saving ? 'Saving...' : `Save ${deadlines.filter((d) => d.id.startsWith('temp-')).length > 0 ? `All ${deadlines.length} Deadlines` : 'Deadlines'}`}
       </OrangeButton>
     </Layout>
   );

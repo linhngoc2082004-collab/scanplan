@@ -6,6 +6,7 @@ FastAPI application with routes for:
 - Deadline CRUD operations
 - Reminder settings management
 - Syllabus upload with deadline extraction
+- Batch confirm deadlines after review
 """
 
 # Windows asyncio fix: psycopg async requires SelectorEventLoopPolicy.
@@ -26,7 +27,7 @@ from .models import (
     SignupRequest, LoginRequest, AuthResponse,
     DeadlineCreate, DeadlineUpdate, DeadlineResponse,
     ReminderSettingsUpdate, ReminderSettingsResponse,
-    SyllabusUploadResponse, DeadlineDetected,
+    SyllabusUploadResponse, DeadlineDetected, ConfirmDeadlinesRequest,
 )
 from .supabase_auth import (
     SupabaseAuthError,
@@ -40,6 +41,12 @@ from .database import (
     create_syllabus_record, close_pool,
 )
 from .deadline_extractor import extract_text, extract_deadlines
+
+# Max upload file size: 10 MB
+MAX_FILE_SIZE = 10 * 1024 * 1024
+
+# Allowed file extensions
+ALLOWED_EXTENSIONS = (".pdf", ".docx", ".txt")
 
 app = FastAPI(title="ScanPlan API", version="1.0.0")
 
@@ -205,6 +212,47 @@ async def create_deadline_route(
     }
 
 
+@app.post("/deadlines/confirm")
+async def confirm_deadlines_route(
+    request: ConfirmDeadlinesRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Save a batch of reviewed deadlines to the database.
+    This is called AFTER the user reviews detected deadlines on the review screen.
+    """
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User ID not found")
+
+    saved_deadlines = []
+    for dl in request.deadlines:
+        try:
+            deadline = await create_deadline(
+                user_id=user_id,
+                title=dl.title,
+                course_name=dl.course_name or "",
+                deadline_type=dl.deadline_type or "assignment",
+                due_date=dl.due_date,
+            )
+            saved_deadlines.append({
+                "id": str(deadline["id"]),
+                "user_id": str(deadline["user_id"]),
+                "title": deadline["title"],
+                "course_name": deadline.get("course_name", ""),
+                "deadline_type": deadline.get("deadline_type", ""),
+                "due_date": deadline["due_date"].isoformat() if hasattr(deadline["due_date"], "isoformat") else str(deadline["due_date"]),
+            })
+        except Exception:
+            # Skip individual deadline if save fails
+            pass
+
+    return {
+        "message": f"Successfully saved {len(saved_deadlines)} deadlines.",
+        "deadlines": saved_deadlines,
+    }
+
+
 @app.put("/deadlines/{deadline_id}")
 async def update_deadline_route(
     deadline_id: str,
@@ -345,18 +393,20 @@ async def upload_syllabus_route(
 ):
     """
     Accept a syllabus file (PDF, DOCX, TXT), extract text,
-    detect deadlines, save them to the database, and return them.
+    detect deadlines, and return them for user review.
+
+    Deadlines are NOT saved automatically — they are returned
+    for the user to review and confirm via POST /deadlines/confirm.
     """
     user_id = current_user.get("id")
     if not user_id:
         raise HTTPException(status_code=401, detail="User ID not found")
 
-    # Validate file type
-    allowed_extensions = (".pdf", ".docx", ".txt")
-    if not file.filename or not file.filename.lower().endswith(allowed_extensions):
+    # Validate file type on the backend (don't trust frontend-only validation)
+    if not file.filename or not file.filename.lower().endswith(ALLOWED_EXTENSIONS):
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file type. Please upload PDF, DOCX, or TXT files.",
+            detail="Unsupported file type. Please upload PDF, DOCX, or TXT files.",
         )
 
     # Read the uploaded file
@@ -364,9 +414,19 @@ async def upload_syllabus_route(
     if not file_bytes:
         raise HTTPException(status_code=400, detail="Empty file")
 
+    # Validate file size on the backend
+    if len(file_bytes) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File is too large. Maximum size is {MAX_FILE_SIZE // (1024 * 1024)} MB.",
+        )
+
     # Extract text from the file
     try:
         text = extract_text(file_bytes, file.filename)
+    except ValueError as e:
+        # Scanned PDF or no extractable text — return a helpful message
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to extract text: {str(e)}")
 
@@ -384,38 +444,23 @@ async def upload_syllabus_route(
             "deadlines": [],
         }
 
-    # Save detected deadlines to the database
-    saved_deadlines = []
-    for dl in detected_deadlines:
-        try:
-            deadline = await create_deadline(
-                user_id=user_id,
-                title=dl["title"],
-                course_name=dl["course_name"],
-                deadline_type=dl["deadline_type"],
-                due_date=dl["due_date"],
-            )
-            saved_deadlines.append({
-                "id": str(deadline["id"]),
-                "user_id": str(deadline["user_id"]),
-                "title": deadline["title"],
-                "course_name": deadline.get("course_name", ""),
-                "deadline_type": deadline.get("deadline_type", ""),
-                "due_date": deadline["due_date"].isoformat() if hasattr(deadline["due_date"], "isoformat") else str(deadline["due_date"]),
-            })
-        except Exception:
-            # Skip individual deadline if save fails
-            pass
-
-    # Record the syllabus upload
+    # Record the syllabus upload (don't save deadlines yet — wait for user confirmation)
     try:
         await create_syllabus_record(user_id, file.filename, "completed")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Could not save syllabus: {str(e)}")
 
     return {
-        "message": f"Successfully detected {len(saved_deadlines)} deadlines.",
-        "deadlines": saved_deadlines,
+        "message": f"Successfully detected {len(detected_deadlines)} deadlines. Review and confirm them to save.",
+        "deadlines": [
+            {
+                "title": dl["title"],
+                "course_name": dl["course_name"],
+                "deadline_type": dl["deadline_type"],
+                "due_date": dl["due_date"],
+            }
+            for dl in detected_deadlines
+        ],
     }
 
 
