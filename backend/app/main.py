@@ -22,7 +22,7 @@ from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 
-from .config import FRONTEND_ORIGIN
+from .config import FRONTEND_ORIGIN, SUPABASE_URL, SUPABASE_ANON_KEY, DATABASE_URL
 from .models import (
     SignupRequest, LoginRequest, AuthResponse,
     DeadlineCreate, DeadlineUpdate, DeadlineResponse,
@@ -91,6 +91,16 @@ async def get_current_user(authorization: str = Header(...)) -> dict:
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
+
+
+@app.get("/health/config")
+async def health_config_check():
+    """Report whether required deployment variables exist without exposing them."""
+    return {
+        "supabase_url_configured": bool(SUPABASE_URL),
+        "supabase_anon_key_configured": bool(SUPABASE_ANON_KEY),
+        "database_url_configured": bool(DATABASE_URL),
+    }
 
 
 # ---------------------------------------------------------------

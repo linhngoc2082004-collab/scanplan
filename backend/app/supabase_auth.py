@@ -17,8 +17,16 @@ class SupabaseAuthError(Exception):
 
 def _request(method: str, url: str, **kwargs) -> httpx.Response:
     """Call Supabase directly instead of inheriting a broken system proxy."""
-    with httpx.Client(trust_env=False, timeout=15.0) as client:
-        response = client.request(method, url, **kwargs)
+    if not SUPABASE_URL or not SUPABASE_ANON_KEY:
+        raise SupabaseAuthError(
+            "Supabase Auth is not configured. Check SUPABASE_URL and SUPABASE_ANON_KEY."
+        )
+
+    try:
+        with httpx.Client(trust_env=False, timeout=15.0) as client:
+            response = client.request(method, url, **kwargs)
+    except httpx.HTTPError as exc:
+        raise SupabaseAuthError(f"Could not connect to Supabase Auth: {exc}") from exc
 
     if response.is_error:
         try:
